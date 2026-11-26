@@ -62,7 +62,15 @@ jobs:
       - name: Build Sensor HAL (MT6897)
         run: |
           chmod +x src/sensor/build.sh
-          ./src/sensor/build.sh
+          set +e
+          ./src/sensor/build.sh > build_sensor.log 2>&1
+          EXIT_CODE=$?
+          cat build_sensor.log
+          if [ $EXIT_CODE -ne 0 ]; then
+            MSG=$(head -n 20 build_sensor.log | tr '\n' ' ')
+            echo "::error title=SENSOR_BUILD_FAILED::$MSG"
+            exit $EXIT_CODE
+          fi
           mkdir -p out/vendor/lib64/hw
           cp src/sensor/build/sensors.mt6897.so out/vendor/lib64/hw/
 
@@ -75,6 +83,8 @@ jobs:
           else
             export RUSTFLAGS="-C linker=$LINKER"
           fi
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$LINKER"
+          export CC_aarch64_linux_android="$LINKER"
           echo "Using NDK Linker: $LINKER"
           cd src/aod
           cargo build --release --target aarch64-linux-android
