@@ -42,10 +42,11 @@
 typedef struct hw_module_t hw_module_t;
 typedef struct hw_device_t hw_device_t;
 typedef struct sensors_module_t sensors_module_t;
+typedef struct hw_module_methods_t hw_module_methods_t;
 
-typedef struct {
-    int (*open)(const hw_module_t *, const char *, hw_device_t **);
-} hw_module_methods_t;
+struct hw_module_methods_t {
+    int (*open)(const struct hw_module_t *, const char *, struct hw_device_t **);
+};
 
 struct hw_module_t {
     uint32_t tag;
