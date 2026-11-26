@@ -1,10 +1,7 @@
 ; ================================================================
-; POCO X6 Pro (duchamp) Strict Enforcing SELinux Policy
+; POCO X6 Pro (duchamp) Hardware FOD & Display Permissions
+; Author: itachi duchamp
 ; ================================================================
 
-(allow hal_fingerprint_default sysfs_202404 (file (read open getattr write)))
-(allow hal_fingerprint_default sysfs_202404 (dir (search read open)))
-(allow hal_fingerprint_default system_server_202404 (binder (call transfer)))
-(allow system_server_202404 hal_fingerprint_default (binder (call transfer)))
-(allow hal_fingerprint_default default_prop_202404 (file (read open getattr map)))
-(allow hal_fingerprint_default system_prop_202404 (file (read open getattr map)))
+(allow hal_fingerprint_default vendor_sysfs_displayfeature (file (read open getattr write)))
+(allow hal_fingerprint_default sysfs (file (read open getattr write)))

@@ -8,11 +8,15 @@
 #include <android/binder_status.h>
 #include <android/binder_parcel.h>
 #include <android/log.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <linux/input.h>
 #include <poll.h>
 #include <pthread.h>
+#include <sys/ioctl.h>
+#include <sys/wait.h>
+#include <cstring>
 #include <atomic>
 #include <thread>
 #include <chrono>
@@ -29,24 +33,75 @@ extern "C" {
 static constexpr const char* TOUCH_FEATURE_SERVICE = 
     "vendor.xiaomi.hw.touchfeature.ITouchFeature/default";
 
+static constexpr const char* DISP_PARAM_NODE = 
+    "/sys/class/mi_display/disp_feature/disp-DSI-0/disp_param";
+
 static constexpr const char* GOODIX_FOD_NODE = 
     "/sys/devices/platform/goodix_ts.0/fod_enable";
 
 static constexpr const char* CPU_BOOST_NODE = 
     "/sys/devices/system/cpu/cpufreq/policy4/scaling_min_freq";
 
-static constexpr int FOD_GESTURE_KEY = 0x152;
+static constexpr int FOD_GESTURE_KEY = 0x152; // 338
 
 static std::atomic<bool> g_authenticated(false);
 static std::atomic<bool> g_finger_down(false);
+
+// AIDL Class definition for NDK binder
+static AIBinder_Class* g_touchClass = nullptr;
+
+static void* dummyClassCreate(void* args) { return args; }
+static void dummyClassDestroy(void* /*userData*/) {}
+static binder_status_t dummyClassTransact(AIBinder*, transaction_code_t, const AParcel*, AParcel*) {
+    return STATUS_UNKNOWN_TRANSACTION;
+}
+
+static void ensureTouchClass(AIBinder* service) {
+    if (!g_touchClass) {
+        g_touchClass = AIBinder_Class_define(
+            "vendor.xiaomi.hw.touchfeature.ITouchFeature",
+            dummyClassCreate, dummyClassDestroy, dummyClassTransact);
+    }
+    if (g_touchClass && service) {
+        AIBinder_associateClass(service, g_touchClass);
+    }
+}
+
+// Fallback command execution for ITouchFeature
+static void executeTouchFeatureServiceCall(int32_t mode, int32_t value) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        char mode_str[16];
+        char val_str[16];
+        snprintf(mode_str, sizeof(mode_str), "%d", mode);
+        snprintf(val_str, sizeof(val_str), "%d", value);
+        char* const args[] = {
+            (char*)"/system/bin/service",
+            (char*)"call",
+            (char*)TOUCH_FEATURE_SERVICE,
+            (char*)"9",
+            (char*)"i32", (char*)"0",
+            (char*)"i32", mode_str,
+            (char*)"i32", val_str,
+            nullptr
+        };
+        execv("/system/bin/service", args);
+        _exit(1);
+    } else if (pid > 0) {
+        int status;
+        waitpid(pid, &status, WNOHANG);
+    }
+}
 
 // Trigger Xiaomi TouchFeature (Mode 10 = FOD Spotlight Area)
 static bool setXiaomiTouchFeature(int32_t mode, int32_t value) {
     AIBinder* service = AServiceManager_checkService(TOUCH_FEATURE_SERVICE);
     if (!service) {
-        LOGE("ITouchFeature service not found");
+        executeTouchFeatureServiceCall(mode, value);
         return false;
     }
+
+    ensureTouchClass(service);
 
     AParcel* in = nullptr;
     AParcel* out = nullptr;
@@ -57,12 +112,31 @@ static bool setXiaomiTouchFeature(int32_t mode, int32_t value) {
         AParcel_writeInt32(in, value);  // value: 1 = arm, 0 = disarm
         status = AIBinder_transact(service, 9, &in, &out, 0); // Tx 9: takes ownership of in
         if (out) AParcel_delete(out);
+    } else {
+        // Fallback to service call if NDK prepare fails
+        executeTouchFeatureServiceCall(mode, value);
     }
     AIBinder_decStrong(service);
     return (status == STATUS_OK);
 }
 
-// Fallback Direct Sysfs Node Write
+// Direct LHBM (Local High Brightness Mode) Spotlight Control
+// On POCO X6 Pro (duchamp), feature 09 = local_hbm, feature 02 = hbm_fod
+static void setLhbmSpotlight(bool enable) {
+    int fd = open(DISP_PARAM_NODE, O_WRONLY | O_CLOEXEC);
+    if (fd >= 0) {
+        if (enable) {
+            write(fd, "09 1\n", 5);
+            write(fd, "02 1\n", 5);
+        } else {
+            write(fd, "09 0\n", 5);
+            write(fd, "02 0\n", 5);
+        }
+        close(fd);
+    }
+}
+
+// Direct Goodix FOD Sysfs Node Write
 static void writeSysfsFodNode(bool enable) {
     int fd = open(GOODIX_FOD_NODE, O_WRONLY | O_CLOEXEC);
     if (fd >= 0) {
@@ -81,22 +155,49 @@ static void boostCpuOnTouch() {
     }
 }
 
-// Low-latency Hardware Input Monitor Thread
-extern "C" void* inputMonitorThread(void* /*arg*/) {
-    LOGI("Starting hardware input event monitor on Goodix Touch");
+// Find Goodix touch input event device dynamically
+static int findGoodixTouchDevice() {
+    // Check known event5 first
     int fd = open("/dev/input/event5", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-    if (fd < 0) {
-        for (int i = 0; i < 10; ++i) {
-            char path[32];
-            snprintf(path, sizeof(path), "/dev/input/event%d", i);
-            fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-            if (fd >= 0) break;
+    if (fd >= 0) {
+        char name[128] = {0};
+        if (ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name) >= 0) {
+            if (strstr(name, "goodix") != nullptr || strstr(name, "touch") != nullptr) {
+                return fd;
+            }
         }
+        close(fd);
     }
 
-    if (fd < 0) {
-        LOGE("Failed to open input device");
-        return nullptr;
+    // Scan all /dev/input/event*
+    for (int i = 0; i < 20; ++i) {
+        char path[32];
+        snprintf(path, sizeof(path), "/dev/input/event%d", i);
+        fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        if (fd >= 0) {
+            char name[128] = {0};
+            if (ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name) >= 0) {
+                if (strstr(name, "goodix") != nullptr) {
+                    LOGI("Discovered Goodix touch device at %s (%s)", path, name);
+                    return fd;
+                }
+            }
+            close(fd);
+        }
+    }
+    return -1;
+}
+
+// Low-latency Hardware Input Monitor Thread
+extern "C" void* inputMonitorThread(void* /*arg*/) {
+    LOGI("Starting hardware input event monitor on Goodix Touch for itachi duchamp");
+
+    int fd = -1;
+    while (fd < 0) {
+        fd = findGoodixTouchDevice();
+        if (fd < 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
     }
 
     struct pollfd pfd = { fd, POLLIN, 0 };
@@ -111,26 +212,36 @@ extern "C" void* inputMonitorThread(void* /*arg*/) {
                 for (int i = 0; i < count; ++i) {
                     if (evs[i].type == EV_KEY && evs[i].code == FOD_GESTURE_KEY) {
                         if (evs[i].value == 1) {
-                            // Instant TOUCH DOWN
+                            // Instant TOUCH DOWN: Turn ON spotlight & boost CPU
                             g_finger_down.store(true);
+                            setLhbmSpotlight(true);
+                            writeSysfsFodNode(true);
                             boostCpuOnTouch();
                             setXiaomiTouchFeature(10, 1);
-                            writeSysfsFodNode(true);
-                            LOGI("Hardware FOD Touch DOWN -> Boost & LHBM Arm");
+                            LOGI("Hardware FOD Touch DOWN -> LHBM Spotlight ON (09 1, 02 1)");
                         } else if (evs[i].value == 0) {
-                            // Touch UP
+                            // Touch UP: Instantly turn OFF spotlight
                             g_finger_down.store(false);
-                            if (g_authenticated.load()) {
-                                setXiaomiTouchFeature(10, 0);
-                                writeSysfsFodNode(false);
-                            }
+                            setLhbmSpotlight(false);
+                            writeSysfsFodNode(false);
+                            setXiaomiTouchFeature(10, 0);
+                            LOGI("Hardware FOD Touch UP -> LHBM Spotlight OFF (09 0, 02 0)");
                         }
                     }
                 }
             }
+        } else if (ret < 0) {
+            // Device reconnect handling
+            close(fd);
+            fd = -1;
+            while (fd < 0) {
+                fd = findGoodixTouchDevice();
+                if (fd < 0) std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            }
+            pfd.fd = fd;
         }
     }
-    close(fd);
+    if (fd >= 0) close(fd);
     return nullptr;
 }
 
@@ -138,8 +249,9 @@ extern "C" void* inputMonitorThread(void* /*arg*/) {
 extern "C" void onFingerprintAuthResult(bool success) {
     LOGI("Auth completed (success=%d) -> Instant LHBM Turn Off", success);
     g_authenticated.store(success);
-    setXiaomiTouchFeature(10, 0);
+    setLhbmSpotlight(false);
     writeSysfsFodNode(false);
+    setXiaomiTouchFeature(10, 0);
 }
 
 // Library constructor running at mfp-daemon startup
