@@ -1,8 +1,0 @@
-# POCO X6 Pro (duchamp) Hardware Compatibility Daemons & Labels
-/system/bin/itachi_aodd                 u:object_r:shell_exec:s0
-/system/etc/init/itachi_aodd\.rc        u:object_r:system_file:s0
-
-/vendor/lib64/libitachi_fp_duchamp\.so  u:object_r:vendor_file:s0
-/vendor/etc/init/itachi_fp_duchamp\.rc  u:object_r:vendor_configs_file:s0
-/vendor/lib64/hw/sensors\.mt6897\.so    u:object_r:vendor_file:s0
-/vendor/overlay/DuchampDozeOverlay\.apk u:object_r:vendor_overlay_file:s0
