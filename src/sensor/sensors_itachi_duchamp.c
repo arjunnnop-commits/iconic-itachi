@@ -67,7 +67,7 @@ struct hw_device_t {
     int (*close)(hw_device_t *);
 };
 
-typedef struct {
+typedef struct sensor_t {
     const char *name;
     const char *vendor;
     int32_t version;
@@ -86,11 +86,11 @@ typedef struct {
     void *reserved[2];
 } sensor_t;
 
-struct sensors_module_t {
+typedef struct sensors_module_t {
     struct hw_module_t common;
     int (*get_sensors_list)(struct sensors_module_t *module, struct sensor_t const **list);
     int (*set_operation_mode)(unsigned int mode);
-};
+} sensors_module_t;
 
 static sensors_module_t* g_real_module = NULL;
 static sensor_t* g_custom_sensor_list = NULL;
