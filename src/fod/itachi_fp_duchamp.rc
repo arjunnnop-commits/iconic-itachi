@@ -1,0 +1,18 @@
+# Copyright (C) 2026 itachi duchamp
+# POCO X6 Pro (duchamp) Hardware Touch & Display Nodes
+
+on boot
+    # Touchscreen FOD node permissions
+    chown system system /sys/devices/platform/goodix_ts.0/fod_enable
+    chmod 0660 /sys/devices/platform/goodix_ts.0/fod_enable
+
+    # Display Character Device symlink
+    mkdir /dev/mi_display 0755 system system
+    symlink /dev/mi_display/disp_feature /dev/disp_feature
+    chown system system /dev/mi_display/disp_feature
+    chmod 0660 /dev/mi_display/disp_feature
+
+    # Fast Unlock Optimizations
+    setprop persist.vendor.sys.fp.fod.lhbmoffafterresult 1
+    setprop persist.vendor.sys.fp.fod.optimize true
+    setprop persist.sys.fp.fod.screenoff true

@@ -1,0 +1,51 @@
+name: Build POCO X6 Pro (duchamp) Hardware Suite
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Set up Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+          add-to-path: true
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build patchelf
+
+      - name: Build All Native Components
+        run: |
+          chmod +x scripts/build_all.sh src/sensor/build.sh
+          ./scripts/build_all.sh
+
+      - name: Create Release Package
+        run: |
+          mkdir -p package
+          cp -r out/* package/
+          cp bake_into_rom.sh package/
+          cp -r sepolicy package/
+          chmod +x package/bake_into_rom.sh
+          cd package && zip -r ../itachi-duchamp-poco-x6-pro-suite.zip . && cd ..
+
+      - name: Upload Built Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: itachi-duchamp-poco-x6-pro-suite
+          path: itachi-duchamp-poco-x6-pro-suite.zip
