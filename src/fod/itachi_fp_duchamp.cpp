@@ -51,8 +51,7 @@ static bool setXiaomiTouchFeature(int32_t mode, int32_t value) {
         AParcel_writeInt32(in, 0);      // touchId = 0
         AParcel_writeInt32(in, mode);   // mode = 10 (FOD)
         AParcel_writeInt32(in, value);  // value: 1 = arm, 0 = disarm
-        status = AIBinder_transact(service, 9, in, &out, 0); // Tx 9
-        AParcel_delete(in);
+        status = AIBinder_transact(service, 9, &in, &out, 0); // Tx 9: takes ownership of in
         if (out) AParcel_delete(out);
     }
     AIBinder_decStrong(service);

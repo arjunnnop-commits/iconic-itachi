@@ -18,7 +18,7 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
 int main(void) {
-    FILE *fp = fopen("/data/system/packages.list", "re");
+    FILE *fp = fopen("/data/system/packages.list", "r");
     if (!fp) return 1;
 
     char line[512];

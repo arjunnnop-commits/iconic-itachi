@@ -98,6 +98,7 @@ static int g_custom_sensor_count = 0;
 static int g_backlight_fd = -1;
 
 // Read real-time 14-bit OLED backlight level
+__attribute__((unused))
 static float get_display_backlight(void) {
     if (g_backlight_fd < 0) {
         g_backlight_fd = open("/sys/class/leds/lcd-backlight/brightness", O_RDONLY | O_CLOEXEC);
