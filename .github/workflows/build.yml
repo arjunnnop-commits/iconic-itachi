@@ -39,10 +39,25 @@ jobs:
       - name: Build FOD Shim & Icon Init
         run: |
           chmod +x src/fod/build.sh
-          ./src/fod/build.sh
+          set +e
+          ./src/fod/build.sh > build_fod.log 2>&1
+          EXIT_CODE=$?
+          cat build_fod.log
+          if [ $EXIT_CODE -ne 0 ]; then
+            MSG=$(head -n 20 build_fod.log | tr '\n' ' ')
+            echo "::error title=FOD_BUILD_FAILED::$MSG"
+            exit $EXIT_CODE
+          fi
           mkdir -p out/vendor/lib64 out/system/bin
           cp src/fod/build/libitachi_fp_duchamp.so out/vendor/lib64/
           cp src/fod/build/itachi_icon_init out/system/bin/
+
+      - name: Upload Debug Log On Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-log
+          path: build_fod.log
 
       - name: Build Sensor HAL (MT6897)
         run: |
