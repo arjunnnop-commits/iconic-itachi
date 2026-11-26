@@ -7,6 +7,7 @@
 #include <android/binder_ibinder.h>
 #include <android/binder_status.h>
 #include <android/binder_parcel.h>
+#include <android/binder_manager.h>
 #include <android/log.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -37,7 +38,7 @@ static std::atomic<bool> g_finger_down(false);
 
 // Trigger Xiaomi TouchFeature (Mode 10 = FOD Spotlight Area)
 static bool setXiaomiTouchFeature(int32_t mode, int32_t value) {
-    AIBinder* service = AIBinder_getService(TOUCH_FEATURE_SERVICE);
+    AIBinder* service = AServiceManager_checkService(TOUCH_FEATURE_SERVICE);
     if (!service) {
         LOGE("ITouchFeature service not found");
         return false;
@@ -46,7 +47,7 @@ static bool setXiaomiTouchFeature(int32_t mode, int32_t value) {
     AParcel* in = nullptr;
     AParcel* out = nullptr;
     binder_status_t status = AIBinder_prepareTransaction(service, &in);
-    if (status == STATUS_OK) {
+    if (status == STATUS_OK && in != nullptr) {
         AParcel_writeInt32(in, 0);      // touchId = 0
         AParcel_writeInt32(in, mode);   // mode = 10 (FOD)
         AParcel_writeInt32(in, value);  // value: 1 = arm, 0 = disarm
@@ -71,7 +72,6 @@ static void writeSysfsFodNode(bool enable) {
 static void boostCpuOnTouch() {
     int fd = open(CPU_BOOST_NODE, O_WRONLY | O_CLOEXEC);
     if (fd >= 0) {
-        // Boost Performance Cores to Max temporarily
         write(fd, "2400000", 7);
         close(fd);
     }
@@ -82,7 +82,6 @@ static void* inputMonitorThread(void*) {
     LOGI("Starting hardware input event monitor on Goodix Touch");
     int fd = open("/dev/input/event5", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) {
-        // Fallback discovery
         for (int i = 0; i < 10; ++i) {
             char path[32];
             snprintf(path, sizeof(path), "/dev/input/event%d", i);

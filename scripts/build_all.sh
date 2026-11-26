@@ -14,7 +14,7 @@ mkdir -p "$ROOT/out/system/bin" "$ROOT/out/vendor/lib64/hw" "$ROOT/out/vendor/et
 echo "-> [1/3] Building itachi_fp_duchamp.so..."
 cmake -S "$ROOT/src/fod" -B "$ROOT/src/fod/build" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
-    -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-35 -DCMAKE_BUILD_TYPE=Release
+    -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-34 -DCMAKE_BUILD_TYPE=Release
 cmake --build "$ROOT/src/fod/build" -j"$(nproc)"
 cp "$ROOT/src/fod/build/libitachi_fp_duchamp.so" "$ROOT/out/vendor/lib64/"
 cp "$ROOT/src/fod/build/itachi_icon_init" "$ROOT/out/system/bin/"
@@ -27,6 +27,10 @@ cp "$ROOT/src/sensor/build/sensors.mt6897.so" "$ROOT/out/vendor/lib64/hw/"
 # 3. Build AOD Daemon
 echo "-> [3/3] Building itachi_aodd..."
 LINKER="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"
+if [ ! -f "$LINKER" ]; then
+    LINKER="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang"
+fi
+
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$LINKER"
 export CC_aarch64_linux_android="$LINKER"
 cd "$ROOT/src/aod"

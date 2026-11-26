@@ -4,8 +4,6 @@
  * Target: POCO X6 Pro (duchamp / n11a)
  */
 
-#include <hardware/sensors.h>
-#include <hardware/hardware.h>
 #include <dlfcn.h>
 #include <android/log.h>
 #include <fcntl.h>
@@ -13,12 +11,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <stdint.h>
 
 #define LOG_TAG "ItachiSensorDuchamp"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 #define REAL_HAL_PATH "/vendor/lib64/hw/sensors.mediatek.V2.0.so"
+
+#define HW_MODULE_TAG 0x48574d54u
+#define SENSORS_HARDWARE_MODULE_ID "sensors"
+#define HAL_MODULE_INFO_SYM HMI
+#define HAL_MODULE_INFO_SYM_AS_STR "HMI"
+
+#define SENSOR_FLAG_ON_CHANGE_MODE 0x00000002u
+#define SENSOR_FLAG_WAKE_UP        0x00000001u
 
 // Verified hardware handles from live POCO X6 Pro dumpsys
 #define XIAOMI_PICKUP_TYPE 33171036
@@ -31,6 +38,59 @@
 #define OPLUS_TILT_TYPE 22
 #define OPLUS_SYNTH_TILT_TYPE 65611
 #define OPLUS_SYNTH_HANDLE 0x6f11
+
+typedef struct hw_module_t hw_module_t;
+typedef struct hw_device_t hw_device_t;
+typedef struct sensors_module_t sensors_module_t;
+
+typedef struct {
+    int (*open)(const hw_module_t *, const char *, hw_device_t **);
+} hw_module_methods_t;
+
+struct hw_module_t {
+    uint32_t tag;
+    uint16_t module_api_version;
+    uint16_t hal_api_version;
+    const char *id;
+    const char *name;
+    const char *author;
+    hw_module_methods_t *methods;
+    void *dso;
+    uint64_t reserved[25];
+};
+
+struct hw_device_t {
+    uint32_t tag;
+    uint32_t version;
+    hw_module_t *module;
+    uint64_t reserved[12];
+    int (*close)(hw_device_t *);
+};
+
+typedef struct {
+    const char *name;
+    const char *vendor;
+    int32_t version;
+    int32_t handle;
+    int32_t type;
+    float maxRange;
+    float resolution;
+    float power;
+    int32_t minDelay;
+    uint32_t fifoReservedEventCount;
+    uint32_t fifoMaxEventCount;
+    const char *stringType;
+    const char *requiredPermission;
+    int64_t maxDelay;
+    uint32_t flags;
+    void *reserved[2];
+} sensor_t;
+
+struct sensors_module_t {
+    struct hw_module_t common;
+    int (*get_sensors_list)(struct sensors_module_t *module, struct sensor_t const **list);
+    int (*set_operation_mode)(unsigned int mode);
+};
 
 static sensors_module_t* g_real_module = NULL;
 static sensor_t* g_custom_sensor_list = NULL;
@@ -114,13 +174,15 @@ static struct hw_module_methods_t itachi_sensors_module_methods = {
 
 struct sensors_module_t HAL_MODULE_INFO_SYM = {
     .common = {
-        .tag = HARDWARE_MODULE_TAG,
-        .version_major = 1,
-        .version_minor = 0,
+        .tag = HW_MODULE_TAG,
+        .module_api_version = 1,
+        .hal_api_version = 0,
         .id = SENSORS_HARDWARE_MODULE_ID,
         .name = "POCO X6 Pro (duchamp) Sensor Wrapper HAL",
         .author = "itachi duchamp",
         .methods = &itachi_sensors_module_methods,
+        .dso = NULL,
+        .reserved = {0}
     },
     .get_sensors_list = itachi_sensor_get_list,
     .set_operation_mode = NULL
