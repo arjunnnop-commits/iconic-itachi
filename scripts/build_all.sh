@@ -11,11 +11,9 @@ echo "================================================================"
 mkdir -p "$ROOT/out/system/bin" "$ROOT/out/vendor/lib64/hw" "$ROOT/out/vendor/etc/init" "$ROOT/out/system/etc/init"
 
 # 1. Build FOD Shim
-echo "-> [1/3] Building itachi_fp_duchamp.so..."
-cmake -S "$ROOT/src/fod" -B "$ROOT/src/fod/build" -G Ninja \
-    -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
-    -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-34 -DCMAKE_BUILD_TYPE=Release
-cmake --build "$ROOT/src/fod/build" -j"$(nproc)"
+echo "-> [1/3] Building itachi_fp_duchamp.so & itachi_icon_init..."
+bash "$ROOT/src/fod/build.sh"
+mkdir -p "$ROOT/out/vendor/lib64"
 cp "$ROOT/src/fod/build/libitachi_fp_duchamp.so" "$ROOT/out/vendor/lib64/"
 cp "$ROOT/src/fod/build/itachi_icon_init" "$ROOT/out/system/bin/"
 

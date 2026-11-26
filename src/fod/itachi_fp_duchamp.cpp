@@ -78,7 +78,7 @@ static void boostCpuOnTouch() {
 }
 
 // Low-latency Hardware Input Monitor Thread
-static void* inputMonitorThread(void*) {
+extern "C" void* inputMonitorThread(void* /*arg*/) {
     LOGI("Starting hardware input event monitor on Goodix Touch");
     int fd = open("/dev/input/event5", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) {
