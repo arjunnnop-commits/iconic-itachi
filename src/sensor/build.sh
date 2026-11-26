@@ -14,6 +14,6 @@ mkdir -p "$ROOT/build"
   -Wl,-soname,sensors.mt6897.so \
   "$ROOT/sensors_itachi_duchamp.c" \
   -o "$ROOT/build/sensors.mt6897.so" \
-  -llog -ldl -pthread
+  -llog -ldl
 
-echo "Built sensors.mt6897.so"
+echo "Built sensors.mt6897.so successfully"

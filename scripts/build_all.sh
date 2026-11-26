@@ -31,6 +31,7 @@ if [ ! -f "$LINKER" ]; then
     LINKER="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang"
 fi
 
+export RUSTFLAGS="-C linker=$LINKER"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$LINKER"
 export CC_aarch64_linux_android="$LINKER"
 cd "$ROOT/src/aod"
