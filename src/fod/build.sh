@@ -14,7 +14,6 @@ mkdir -p "$ROOT/build"
 # 1. Compile libitachi_fp_duchamp.so
 echo "Building libitachi_fp_duchamp.so..."
 $CXX --target=$TARGET -shared -fPIC -O2 -std=c++20 \
-  -D__ANDROID_API__=34 \
   -Wl,-soname,libitachi_fp_duchamp.so \
   -Wl,-z,max-page-size=16384 \
   "$ROOT/itachi_fp_duchamp.cpp" \
@@ -24,7 +23,6 @@ $CXX --target=$TARGET -shared -fPIC -O2 -std=c++20 \
 # 2. Compile itachi_icon_init executable
 echo "Building itachi_icon_init..."
 $CC --target=$TARGET -fPIE -pie -O2 \
-  -D__ANDROID_API__=34 \
   -Wl,-z,max-page-size=16384 \
   "$ROOT/itachi_icon_init.c" \
   -o "$ROOT/build/itachi_icon_init" \

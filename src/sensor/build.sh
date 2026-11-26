@@ -10,7 +10,6 @@ TARGET="aarch64-linux-android34"
 mkdir -p "$ROOT/build"
 
 $CC --target=$TARGET -shared -fPIC -O2 -Wall -Wextra \
-  -D__ANDROID_API__=34 \
   -Wl,-soname,sensors.mt6897.so \
   -Wl,-z,max-page-size=16384 \
   "$ROOT/sensors_itachi_duchamp.c" \

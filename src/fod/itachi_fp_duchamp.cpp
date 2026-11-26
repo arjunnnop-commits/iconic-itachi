@@ -7,7 +7,6 @@
 #include <android/binder_ibinder.h>
 #include <android/binder_status.h>
 #include <android/binder_parcel.h>
-#include <android/binder_manager.h>
 #include <android/log.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -17,6 +16,11 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
+
+// libbinder_ndk platform service manager declaration
+extern "C" {
+    AIBinder* AServiceManager_checkService(const char* instance);
+}
 
 #define LOG_TAG "ItachiFpDuchamp"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
