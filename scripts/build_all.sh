@@ -26,10 +26,7 @@ cp "$ROOT/src/sensor/build/sensors.mt6897.so" "$ROOT/out/vendor/lib64/hw/"
 
 # 3. Build AOD Daemon
 echo "-> [3/3] Building itachi_aodd..."
-LINKER="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"
-if [ ! -f "$LINKER" ]; then
-    LINKER="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang"
-fi
+LINKER=$(find "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" -name "aarch64-linux-android*-clang" | sort -V | tail -n 1)
 
 export RUSTFLAGS="-C linker=$LINKER"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$LINKER"

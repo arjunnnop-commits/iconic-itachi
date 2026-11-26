@@ -3,10 +3,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NDK="${ANDROID_NDK_ROOT:-${ANDROID_NDK_HOME:-$HOME/Android/Sdk/ndk/30.0.16248370}}"
 
-CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"
-if [ ! -f "$CC" ]; then
-    CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang"
-fi
+CC=$(find "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" -name "aarch64-linux-android*-clang" | sort -V | tail -n 1)
+echo "Using Clang compiler: $CC"
 
 mkdir -p "$ROOT/build"
 

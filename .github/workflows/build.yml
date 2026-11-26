@@ -15,10 +15,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Android NDK
+        id: setup-ndk
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r27c
           add-to-path: true
+
+      - name: Export NDK Environment Variables
+        run: |
+          echo "ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -28,7 +34,7 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build patchelf
+          sudo apt-get install -y cmake ninja-build patchelf zip
 
       - name: Build FOD Shim & Icon Init
         run: |
@@ -49,10 +55,8 @@ jobs:
 
       - name: Build AOD Native Daemon (Rust)
         run: |
-          LINKER="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"
-          if [ ! -f "$LINKER" ]; then
-            LINKER="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang"
-          fi
+          LINKER=$(find "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin" -name "aarch64-linux-android*-clang" | sort -V | tail -n 1)
+          echo "Using NDK Linker: $LINKER"
           export RUSTFLAGS="-C linker=$LINKER"
           cd src/aod
           cargo build --release --target aarch64-linux-android
